@@ -1,11 +1,11 @@
 // This is a Cloudflare Worker function that will be deployed to handle the API request
 export async function onRequest(context) {
-  // Get the email from the query parameters
+  // Get the username from the query parameters
   const url = new URL(context.request.url)
-  const email = url.searchParams.get("email")
+  const username = url.searchParams.get("username")
 
-  if (!email) {
-    return new Response(JSON.stringify({ error: "Email is required" }), {
+  if (!username) {
+    return new Response(JSON.stringify({ error: "Username is required" }), {
       status: 400,
       headers: {
         "Content-Type": "application/json",
@@ -15,8 +15,8 @@ export async function onRequest(context) {
   }
 
   try {
-    // Construct the URL with the email
-    const targetUrl = `https://flask-hello-world-pi-indol.vercel.app/raw/${encodeURIComponent(email)}`
+    // Construct the URL with the username
+    const targetUrl = `https://jaefu3p97g.execute-api.us-east-1.amazonaws.com/default/smttab?username=${encodeURIComponent(username)}`
 
     console.log(`Fetching data from: ${targetUrl}`)
 
@@ -61,110 +61,43 @@ export async function onRequest(context) {
 
     // Handle different response types
     if (contentType.includes("application/json")) {
-      // If it's JSON, parse it and extract the country code
+      // If it's JSON, parse it
       const jsonData = await response.json()
       console.log("Received JSON response:", JSON.stringify(jsonData).substring(0, 200))
 
-      // Check if it has the expected structure with country_code
-      if (jsonData?.data?.country_code) {
-        return new Response(jsonData.data.country_code, {
-          headers: {
-            "Content-Type": "text/plain",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-          },
-        })
-      } else {
-        // Try to extract country_code from the JSON string
-        const jsonString = JSON.stringify(jsonData)
-        const countryCodeMatch = jsonString.match(/country_code["']?\s*:\s*["']?([A-Z]{2})["']?/i)
-
-        if (countryCodeMatch && countryCodeMatch[1]) {
-          return new Response(countryCodeMatch[1], {
-            headers: {
-              "Content-Type": "text/plain",
-              "Cache-Control": "no-store",
-              "Access-Control-Allow-Origin": "*",
-            },
-          })
-        }
-
-        // Return an error if we can't find the country code
-        return new Response(JSON.stringify({ error: "Could not extract country code from response" }), {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-          },
-        })
-      }
-    } else {
-      // If it's not JSON, get the text
-      const data = await response.text()
-      console.log(`Received text response (first 200 chars): ${data.substring(0, 200)}`)
-
-      // Try to extract country_code from the text
-      const countryCodeMatch = data.match(/country_code["']?\s*:\s*["']?([A-Z]{2})["']?/i)
-
-      if (countryCodeMatch && countryCodeMatch[1]) {
-        return new Response(countryCodeMatch[1], {
-          headers: {
-            "Content-Type": "text/plain",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-          },
-        })
-      }
-
-      // Check if it's HTML
-      if (data.trim().startsWith("<!DOCTYPE html>") || data.trim().startsWith("<html")) {
-        console.log("Received HTML response, attempting to extract country code")
-
-        // Try to extract the country code from the HTML
-        const htmlCountryCodeMatch = data.match(/country_code["']?\s*:\s*["']?([A-Z]{2})["']?/i)
-
-        if (htmlCountryCodeMatch && htmlCountryCodeMatch[1]) {
-          return new Response(htmlCountryCodeMatch[1], {
-            headers: {
-              "Content-Type": "text/plain",
-              "Cache-Control": "no-store",
-              "Access-Control-Allow-Origin": "*",
-            },
-          })
-        }
-
-        // If we can't extract a country code, return an error
-        return new Response(JSON.stringify({ error: "Could not extract country code from HTML response" }), {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-          },
-        })
-      }
-
-      // If it's plain text and looks like a country code, return it directly
-      if (data.trim().length === 2 && /^[A-Z]{2}$/.test(data.trim())) {
-        return new Response(data.trim(), {
-          headers: {
-            "Content-Type": "text/plain",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-          },
-        })
-      }
-
-      // If we can't extract a country code, return an error
-      return new Response(JSON.stringify({ error: "Could not extract country code from response" }), {
-        status: 500,
+      // Pass through the JSON data
+      return new Response(JSON.stringify(jsonData), {
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
           "Access-Control-Allow-Origin": "*",
         },
       })
+    } else {
+      // If it's not JSON, get the text
+      const data = await response.text()
+      console.log(`Received text response (first 200 chars): ${data.substring(0, 200)}`)
+
+      // Try to parse it as JSON
+      try {
+        const jsonData = JSON.parse(data)
+        return new Response(JSON.stringify(jsonData), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        })
+      } catch (e) {
+        // Not JSON, return as text
+        return new Response(data, {
+          headers: {
+            "Content-Type": "text/plain",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        })
+      }
     }
   } catch (error) {
     console.error(`Error in Cloudflare Worker: ${error.message || "Unknown error"}`)
@@ -201,4 +134,3 @@ export async function onRequest(context) {
     )
   }
 }
-
